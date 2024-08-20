@@ -2,7 +2,14 @@ import numpy as np
 import json
 
 def get_data(data_path):
-    data = np.loadtxt(data_path, delimiter=',', skiprows=1)
+    try:
+        data = np.loadtxt(data_path, delimiter=',', skiprows=1)
+    except FileNotFoundError:
+        print(f"Error: The file '{data_path}' was not found.")
+        exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        exit(1)
     x = data[:,0]
     y = data[:,1]
     x = x.reshape(x.shape[0], 1)
