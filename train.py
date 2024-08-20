@@ -1,62 +1,55 @@
 import numpy as np
+import json
 
-data = np.loadtxt('data.csv', delimiter=',', skiprows=1)
-
-x = data[:,0]
-y = data[:,1]
-
-print("Before reshaping")
-print(x.shape)
-print(y.shape)
-
-print("After reshaping")
-x = x.reshape(x.shape[0], 1)
-y = y.reshape(y.shape[0], 1)
-print(x.shape)
-print(y.shape)
-
-
-ones = np.ones(x.shape)
-print("ones vector shape : ")
-print(ones.shape)
-x = np.hstack((x, ones))
-print("new x shape after stacking : ")
-print(x.shape)
-print(x)
-
-theta = np.zeros((2,1))
-print(f"theta : {theta}")
-
+def get_data(data_path):
+    data = np.loadtxt(data_path, delimiter=',', skiprows=1)
+    x = data[:,0]
+    y = data[:,1]
+    x = x.reshape(x.shape[0], 1)
+    y = y.reshape(y.shape[0], 1)
+    mean_x = np.mean(x)
+    std_x = np.std(x)
+    x = (x - mean_x) / std_x
+    ones = np.ones(x.shape)
+    x = np.hstack((x, ones))
+    return x, y, mean_x, std_x
 
 def model(X, theta):
-    return x.dot(theta)
+    return X.dot(theta)
 
-def cost_function(x, y, theta):
+def cost_function(X, y, theta):
     m = len(y)
-    return (1/(2*m)) * np.sum ((model(x,theta) - y)**2)
+    return (1/(2*m)) * np.sum((model(X, theta) - y)**2)
 
-print(cost_function(x, y, theta))
-
-
-def grad(x, y, theta):
+def grad(X, y, theta):
     m = len(y)
-    prediction_error = model(x, theta) - y
-    print(f"Prediction error: {prediction_error}")  # Debugging output
-    
-    gradient = (1/m) * x.T.dot(prediction_error)
-    print(f"Gradient: {gradient}")  # Debugging output
-    
+    prediction_error = model(X, theta) - y
+    gradient = (1/m) * X.T.dot(prediction_error)
     return gradient
 
-
-print("dssdfsdfsdfsdf",theta)
-
-def gradient_descente(x, y, theta, learning_rate, iterations):
-    print('----------------')
-    print(theta - learning_rate * grad(x, y, theta))
+def gradient_descente(X, y, theta, learning_rate, iterations):
     for _ in range(iterations):
-        theta = theta - learning_rate * grad(x, y, theta)
+        gradient = grad(X, y, theta)
+        theta = theta - learning_rate * gradient
+        if np.any(np.isnan(theta)) or np.any(np.isinf(theta)):
+            raise ValueError("Theta contains NaN or infinity values.")
     return theta
 
-final_theta = gradient_descente(x, y, theta, learning_rate=0.0001, iterations=1000)
-print(final_theta)
+def main():
+    x, y, mean_x, std_x = get_data('data.csv')
+    theta = np.zeros((2,1))
+
+    final_theta = gradient_descente(x, y, theta, learning_rate=0.01, iterations=1000)
+    print(f"Final theta: {final_theta}")
+    parameters = {
+        'theta': final_theta.flatten().tolist(),
+        'mean_x': float(mean_x),
+        'std_x': float(std_x)
+    }
+
+    with open('.model_parameters.json', 'w') as f:
+        json.dump(parameters, f)
+    
+
+if __name__ == "__main__":
+    main()
