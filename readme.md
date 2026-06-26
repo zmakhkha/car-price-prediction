@@ -1,95 +1,159 @@
-## Car Price Prediction using Linear Regression
+# Car Price Prediction — Linear Regression from Scratch
 
-This project demonstrates a simple linear regression model for predicting car prices based on mileage. The project is split into two main scripts: one for training the model and another for making predictions using the trained model. The project also includes functionality for saving and loading model parameters using JSON format.
+Predict a used car's price from its mileage using **single-variable linear regression**, trained with **batch gradient descent**. No scikit-learn — just NumPy and the raw math, so you can see exactly how the model learns.
 
-### Overview
+This README is written to teach the **core logic**. If you're building the same thing, read it top to bottom and you'll understand every line.
 
-The goal of this project is to create a linear regression model that estimates the price of a car based on its mileage. Linear regression is a foundational machine learning algorithm used to model the relationship between a dependent variable and one or more independent variables.
+---
 
-### Components
+## The idea in one sentence
 
-1. **Training Script (`train.py`)**:
-   - **Purpose**: Trains the linear regression model using a dataset of car mileage and prices.
-   - **Features**:
-     - Loads data from a CSV file.
-     - Normalizes the feature (mileage) for better performance.
-     - Implements gradient descent to minimize the cost function and optimize the model parameters (`theta`).
-     - Saves the model parameters, normalization mean, and standard deviation to a JSON file for later use.
+Fit a straight line `price = a · mileage + b` to the data by repeatedly nudging `a` and `b` in the direction that reduces the average squared error.
 
-2. **Prediction Script (`predict.py`)**:
-   - **Purpose**: Loads the trained model parameters and uses them to predict the price of a car based on user input for mileage.
-   - **Features**:
-     - Reads the model parameters and normalization values from the JSON file.
-     - Prompts the user to enter the car mileage.
-     - Normalizes the input mileage using the saved normalization parameters.
-     - Predicts the car price using the trained model and displays the result.
+---
 
-### Files
+## The math (exactly as implemented)
 
-- `data.csv`: A CSV file containing the dataset with columns for mileage and price. This file is used for training the model.
-- `train.py`: Script for training the linear regression model and saving the parameters.
-- `predict.py`: Script for predicting car prices using the saved model parameters.
-- `model_parameters.json`: JSON file containing the trained model parameters and normalization statistics.
+### 1. Hypothesis — the line we fit
 
-### Setup and Installation
-
-1. **Create a Virtual Environment**:
-   - It is recommended to use a virtual environment to manage dependencies. Create one using:
-     ```bash
-     python -m venv venv
-     ```
-   - Activate the virtual environment:
-     - **On Windows**:
-       ```bash
-       venv\Scripts\activate
-       ```
-     - **On macOS/Linux**:
-       ```bash
-       source venv/bin/activate
-       ```
-
-2. **Install Dependencies**:
-   - Install the required package using `pip`:
-     ```bash
-     pip install numpy
-     ```
-
-3. **Run the Scripts**:
-   - **Training the Model**:
-     - Ensure you have your dataset (`data.csv`) in the project directory.
-     - Run the training script:
-       ```bash
-       python train.py
-       ```
-     - This will generate a `model_parameters.json` file with the model parameters.
-
-   - **Making Predictions**:
-     - Ensure you have the `model_parameters.json` file from the training step.
-     - Run the prediction script:
-       ```bash
-       python predict.py
-       ```
-     - Enter the car mileage when prompted. The script will output the estimated price.
-
-### Requirements
-
-- Python 3.x
-- `numpy` library
-
-### Example
-
-**Training Output**:
-```
-Final theta: [[0.5]
-               [10.0]]
+```python
+def model(X, theta):
+    return X.dot(theta)
 ```
 
-**Prediction Interaction**:
+We pack the parameters into a vector and the inputs into a matrix so a single dot product computes predictions for **every** sample at once:
+
 ```
-Enter the car mileage: 50000
-Predicted price for mileage 50000: $30000.00
+h(X) = X · θ
+
+X = [ x₁  1 ]        θ = [ θ₀ ]        →   h(xᵢ) = θ₀·xᵢ + θ₁
+    [ x₂  1 ]            [ θ₁ ]
+    [ ⋮   ⋮ ]
 ```
 
-### Contributing
+- `θ₀` (`theta[0]`) is the **slope**, `θ₁` (`theta[1]`) is the **intercept** (bias).
+- The column of `1`s is the trick that lets one matrix multiply produce `slope·x + intercept`. Without it, the line is forced through the origin.
 
-Feel free to fork this repository and submit pull requests for improvements or bug fixes. Contributions to enhance the model or extend functionality are welcome.
+### 2. Cost function — how wrong we are
+
+```python
+def cost_function(X, y, theta):
+    m = len(y)
+    return (1/(2*m)) * np.sum((model(X, theta) - y)**2)
+```
+
+```
+J(θ) = (1 / 2m) · Σ (h(xᵢ) − yᵢ)²
+```
+
+Mean squared error. The `2` in the denominator isn't statistics — it's there so the derivative comes out clean (the `2` from the square cancels it).
+
+### 3. Gradient — which way is downhill
+
+```python
+def grad(X, y, theta):
+    m = len(y)
+    prediction_error = model(X, theta) - y
+    gradient = (1/m) * X.T.dot(prediction_error)
+    return gradient
+```
+
+```
+∇J(θ) = (1 / m) · Xᵀ · (h(X) − y)
+```
+
+`Xᵀ · error` is the heart of it: it correlates each feature with the residuals, producing one gradient component per parameter (slope and intercept) in a single matrix multiply.
+
+### 4. Gradient descent — learning
+
+```python
+def gradient_descente(X, y, theta, learning_rate, iterations):
+    for _ in range(iterations):
+        gradient = grad(X, y, theta)
+        theta = theta - learning_rate * gradient
+    return theta
+```
+
+```
+θ := θ − α · ∇J(θ)        repeated `iterations` times
+```
+
+- `α` (**learning rate**) = `0.01` — step size. Too big diverges (NaN/inf — the code guards against this and raises); too small crawls.
+- `iterations` = `1000` — fixed budget, no early stopping.
+
+---
+
+## Why normalization is the part people get wrong
+
+Mileage values are huge (~89,000–240,000 km). Feed those raw into gradient descent and the slope's gradient dwarfs the intercept's, so a learning rate that's stable for one blows the other up. Fix: **z-score standardization** before training.
+
+```python
+mean_x = np.mean(x)
+std_x  = np.std(x)
+x = (x - mean_x) / std_x          # now mean ≈ 0, std ≈ 1
+```
+
+```
+x_norm = (x − μ) / σ
+```
+
+**The consequence that trips everyone up:** `theta` is now learned on the *normalized* scale. So you must save `μ` and `σ` alongside `theta`, and apply the **exact same** transform to any new input before predicting. That's why the saved model is three things, not one:
+
+```json
+{ "theta": [slope, intercept], "mean_x": μ, "std_x": σ }
+```
+
+---
+
+## Prediction (denormalize → apply the line)
+
+```python
+def predict_price(mileage, theta, mean_x, std_x):
+    normalized_mileage = (mileage - mean_x) / std_x   # same transform as training
+    x = np.array([[normalized_mileage, 1]])           # same [x, 1] layout
+    price = x.dot(theta)                              # slope·x_norm + intercept
+    return price[0][0]
+```
+
+The two non-negotiables: **(1)** normalize the input with the *training* `μ`/`σ`, **(2)** append the `1` so the matrix shapes match. Skip either and the number is garbage.
+
+> ⚠️ Linear regression **extrapolates blindly**. The training data spans ~89k–240k km, so asking for 5,000 km projects the line far outside anything it ever saw and can return a nonsensical (even negative) price. That's expected behavior, not a bug.
+
+---
+
+## Files
+
+| File | Responsibility |
+|------|----------------|
+| `train.py` | Load CSV → plot → normalize → add bias column → run gradient descent → save params. Core functions: `get_data`, `model`, `cost_function`, `grad`, `gradient_descente`. |
+| `predict.py` | Load saved params → prompt for mileage → normalize → predict. Functions: `load_parameters`, `predict_price`. |
+| `data.csv` | Training data, two columns: `km,price` (header skipped via `skiprows=1`). |
+| `.model_parameters.json` | Persisted model: `theta` (`[slope, intercept]`), `mean_x`, `std_x`. |
+
+---
+
+## Run it
+
+```bash
+python3 -m venv venv && source venv/bin/activate
+pip install numpy matplotlib
+
+python train.py      # learns θ, writes .model_parameters.json + diagnostic PNGs
+python predict.py    # prompts: "Enter the car mileage:"  →  prints estimated price
+```
+
+Training prints the learned `Final theta: [[slope] [intercept]]` and saves it. Prediction reloads it and applies the line.
+
+---
+
+## Build-it-yourself checklist
+
+1. Load `(x, y)` from CSV; reshape to column vectors.
+2. Standardize `x` with `(x − μ)/σ`; **keep `μ` and `σ`**.
+3. Append a column of `1`s to `x` → shape `(m, 2)`.
+4. Init `theta = zeros((2, 1))`.
+5. Loop `iterations` times: `theta -= α · (1/m)·Xᵀ·(Xθ − y)`.
+6. Save `theta`, `μ`, `σ`.
+7. To predict: normalize the input with the saved `μ`/`σ`, append `1`, dot with `theta`.
+
+That's the entire algorithm. Everything else is plotting and I/O.
