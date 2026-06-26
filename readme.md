@@ -10,6 +10,12 @@ This README is written to teach the **core logic**. If you're building the same 
 
 Fit a straight line `price = a · mileage + b` to the data by repeatedly nudging `a` and `b` in the direction that reduces the average squared error.
 
+| The data | The line we learn |
+|---|---|
+| ![Price vs mileage scatter](assets/data_scatter.png) | ![Fitted regression line](assets/regression_fit.png) |
+
+More mileage, lower price — a roughly linear trend. The model's whole job is to find the single straight line that sits closest to those points.
+
 ---
 
 ## The math (exactly as implemented)
@@ -81,6 +87,10 @@ def gradient_descente(X, y, theta, learning_rate, iterations):
 - `α` (**learning rate**) = `0.01` — step size. Too big diverges (NaN/inf — the code guards against this and raises); too small crawls.
 - `iterations` = `1000` — fixed budget, no early stopping.
 
+You can *watch* it work: plotting the cost `J(θ)` after each step shows the classic gradient-descent curve — a steep early drop as it finds the rough slope, then a long flattening as it fine-tunes. Here it falls from ~20.9M to ~0.22M.
+
+![Cost per iteration](assets/cost_curve.png)
+
 ---
 
 ## Why normalization is the part people get wrong
@@ -143,6 +153,8 @@ python predict.py    # prompts: "Enter the car mileage:"  →  prints estimated 
 ```
 
 Training prints the learned `Final theta: [[slope] [intercept]]` and saves it. Prediction reloads it and applies the line.
+
+The graphs above are regenerated from the data and the saved model with `python make_plots.py` (writes `assets/`), so they always match the real numbers.
 
 ---
 
